@@ -1,0 +1,134 @@
+# In the last part we are going to see how to create a model and how to improve he results to make the model better
+
+
+'''
+Once we finish with the EDA its time to perform the model we want to create
+to make predictions, first we are going to see the results with the default model
+and later we prepare the model to increase the accuracy
+'''
+
+# With train_test_split create the segmentation to train and predict with the model
+X_train, X_test, y_train, y_test = tts(X_resampled, y_resampled, test_size=0.25, random_state=117)
+# Check the shape of the train and test
+X_train.shape, X_test.shape, y_train.shape, y_test.shape
+
+# Implement the K-NN model
+knn = KNeighborsClassifier()
+# Fit the model with the train values
+knn.fit(X_train, y_train)
+y_pred_knn = knn.predict(X_test)
+
+# Lets see the Confusion Matrix
+cf_matrix_knn = confusion_matrix(y_test, y_pred_knn)
+print(cf_matrix_knn)
+ax = sns.heatmap(cf_matrix_knn/np.sum(cf_matrix_knn),
+                 annot=True, fmt='.2%', cmap='binary')
+ax.set_title('K-NN Confusion Matrix')
+ax.set_xlabel('Predicted Values')
+ax.set_ylabel('Actual values')
+plt.show()
+
+# Evaluate the K-NN with metrics
+print(classification_report(y_test, y_pred_knn))
+
+'''
+Time to improve the model preparing the data
+'''
+# First use a scaler for the numerical data
+stc = StandardScaler()
+stc.fit(X_train)
+
+# Scale the X
+X_train_stc = stc.transform(X_train)
+X_test_stc = stc.transform(X_test)
+
+print('Lets see how the first rows of our data looks now after we scale')
+print(pd.DataFrame(X_train_stc).head())
+
+'''
+One important step while we are preparing the data, its to Reduce the Dimensionality,
+This help us selecting the most critical features eliminating the redundant ones
+'''
+select_feature = SelectKBest(f_classif, k=10).fit(X_train, y_train)
+print('Score list:', select_feature.scores_)
+print('Feature list:', X_train.columns)
+
+'''
+With the preparation of the data finish its time to see the model
+'''
+X_train_2 = select_feature.transform(X_train)
+X_test_2 = select_feature.transform(X_test)
+
+knnc = KNeighborsClassifier()
+knnc.fit(X_train_2, y_train)
+y_pred_knnc = knnc.predict(X_test_2)
+
+cf_matrix_knnc = confusion_matrix(y_test, y_pred_knnc)
+
+ax = sns.heatmap(cf_matrix_knnc/np.sum(cf_matrix_knnc), annot=True,
+                 fmt='.2%', cmap='binary')
+ax.set_title('K-NN Confusion Matrix')
+ax.set_xlabel('Predicted values')
+ax.set_ylabel('Actual values')
+plt.show()
+
+# Lets see the metrics
+print(classification_report(y_test, y_pred_knnc))
+
+
+'''
+To improve the model we need to change the hyperparameters in the K-NN model
+'''
+# K-NN only need 2 hiperparameters to be set
+param_grid = {'n_neighbors': np.arange(1,40),
+              'metric':['euclidean', 'manhattan', 'minkowski']}
+knn = KNeighborsClassifier()
+knn_cv = GridSearchCV(knn, param_grid=param_grid)
+knn_cv.fit(X_train_2, y_train)
+y_pred_knn_cv = knn_cv.predict(X_test_2)
+
+print('Best score' +str(knn_cv.best_score_))
+print('Best params' + str(knn_cv.best_params_))
+
+cf_matrix_knn_cv = confusion_matrix(y_test, y_pred_knn_cv)
+
+ax = sns.heatmap(cf_matrix_knn_cv/np.sum(cf_matrix_knn_cv),
+                annot=True, fmt='.2%', cmap='binary')
+ax.set_title('K-NN Confusion Matrix')
+ax.set.xlabel('Predicted Values')
+ax.set_ylabel('Actual Values')
+plt.show()
+
+print(classification_report(y_test, y_pred_knn_cv))
+
+'''
+In our case the Precision is more important than recall, cause is better to classify
+potable water as non-potable(FN) and perform further test than classify non-potable water
+as potable(FP) 
+'''
+# Create a numpy array for futur K value
+neighbors = np.arange(1,40)
+train_accuracy = np.empty(len(neighbors))
+test_accuracy = np.empty(len(neighbors))
+
+# Loop for over different values of K
+for i, k in enumerate(neighbors):
+    # Setup the knn clasifier
+    knn = KNeighborsClassifier(n_neighbors=k)
+    # Fit the model
+    knn.fit(X_train_2, y_train)
+    # Compute accuracy on the training set
+    train_accuracy[i] = knn.score(X_train_2, y_train)
+    # Compute accuracy for the test set
+    test_accuracy[i] = knn.score(X_test_2, y_test)
+    
+# Generate the plot
+sns.set(rc={'axes.facecolor':'#ECECEC'})
+plt.figure(figsize=(12,8,6))
+plt.title(label='K-NN: Varying Number of Neighbors', ha='center')
+plt.plot(neighbors, test_accuracy, label='Testing Accuracy')
+plt.plot(neighbors, train_accuracy, label='Training Accuracy')
+plt.legend()
+plt.xlabel('Number of Neighbors')
+plt.ylabel('Accuracy')
+plt.show()
