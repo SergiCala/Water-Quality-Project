@@ -1,0 +1,71 @@
+# EDA
+# Import the CSV
+df_water = pd.read_csv('waterQuality.csv')
+df_water.shape
+
+'''
+First of all its analize the data
+'''
+# Check empty and null and duplicate values.
+df_water.isna().sum()
+df_water.isnull().sum()
+df_water.duplicated().sum()
+
+# Drop the NaN values
+df_water = df_water.dropna()
+# Check the type of the columns.
+df_water.dtypes
+
+# Some columns are an object, lets correct this.
+df_water['ammonia'] = pd.to_numeric(df_water['ammonia'], errors='coerce')
+df_water['is_safe'] = pd.to_numeric(df_water['is_safe'], errors='coerce')
+
+# Once we correct this, lets see the balance in our dataframe using graphs
+
+for column in df_water:
+    if column != 'is_safe':
+        plt.figure(figsize=(12,8))
+        sns.boxplot(x='is_safe', y=column, data=df_water)
+        plt.title(f'Boxplot of {column}')
+        plt.xlabel('is safe')
+        plt.ylabel(f'{column}')
+        plt.show()
+        
+# Now lets see the target variable
+plt.figure(figsize=(12,8))
+plt.title('Target Variable')
+ax = sns.countplot(x=df_water['is_safe'], data=df_water)
+abs_values = df_water['is_safe'].value_counts(ascending=False).values
+ax.bar_label(container=ax.containers[0], labels=abs_values)
+plt.show()
+
+'''
+To correct the imbalance we gonna use Random Over Sampler, this is going to generate
+the same number of rows for both values of the is_safe column, if we would dont dealt
+with that models would then prefer the class with more vaules
+'''
+# Separate the values for the Over Sampling
+columns = df_water.columns
+columns = [c for c in columns if c not in ['is_safe']]
+y = df_water['is_safe']
+y = y.dropna()
+X = df_water[columns]
+X = X.dropna()
+# Create the instance
+ros = RandomOverSampler(sampling_strategy='minority')
+# Fit the instance
+X_resampled, y_resampled = ros.fit_resample(X, y)
+print(y_resampled.value_counts())
+# Plot again the variable
+plt.figure(figsize=(12,8))
+plt.title('Balanced target variable')
+ax = sns.countplot(x=y_resampled, data=df_water)
+plt.show()
+
+# See the correation between the variables
+corr = df_water.corr()
+# Graph it
+plt.figure(figsize=(12,8))
+sns.heatmap(corr, xticklabels=corr.columns, yticklabels=corr.columns,
+            annot=True, fmt= '.2f')
+plt.show()
